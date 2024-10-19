@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/Introduction to Deep Learning.iml" filepath="$PROJECT_DIR$/.idea/Introduction to Deep Learning.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/Build GPT from scratch.iml" filepath="$PROJECT_DIR$/.idea/Build GPT from scratch.iml" />
     </modules>
   </component>
 </project>
