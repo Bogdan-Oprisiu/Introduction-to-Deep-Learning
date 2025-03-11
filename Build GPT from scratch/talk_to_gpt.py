@@ -1,7 +1,9 @@
+#!/usr/bin/env python
 import math
 import torch
 import torch.nn as nn
 import pickle
+
 
 # ------------------------------
 # Model and Positional Encoding
@@ -24,16 +26,14 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1)]
         return self.dropout(x)
 
+
 class GPTSmall(nn.Module):
     def __init__(self, vocab_size, d_model=128, nhead=8, num_layers=2, dim_feedforward=512, dropout=0.1):
         super().__init__()
         self.token_embedding = nn.Embedding(vocab_size, d_model)
         self.positional_encoding = PositionalEncoding(d_model, dropout)
-
-        # Create a stack of TransformerDecoderLayers
         decoder_layer = nn.TransformerDecoderLayer(d_model, nhead, dim_feedforward, dropout)
         self.transformer_decoder = nn.TransformerDecoder(decoder_layer, num_layers)
-
         self.fc_out = nn.Linear(d_model, vocab_size)
         self.d_model = d_model
 
@@ -50,60 +50,57 @@ class GPTSmall(nn.Module):
         # Transformer expects shape: (seq_len, batch_size, d_model)
         tgt_emb = tgt_emb.transpose(0, 1)
         tgt_mask = self.generate_square_subsequent_mask(tgt_emb.size(0)).to(tgt_emb.device)
-        # Using the same tensor for memory (GPT-style self-attention)
+        # GPT-style self-attention using same tensor as memory
         output = self.transformer_decoder(tgt_emb, tgt_emb, tgt_mask=tgt_mask)
-        output = output.transpose(0, 1)  # Back to (batch_size, seq_len, d_model)
+        output = output.transpose(0, 1)  # (batch_size, seq_len, d_model)
         logits = self.fc_out(output)
         return logits
+
 
 # ------------------------------
 # Vocabulary and Tokenizer
 # ------------------------------
-# These helper functions convert between text and token IDs.
-# They rely on vocabulary mappings saved in 'vocab.pkl' (a dictionary with 'stoi' and 'itos').
-
 def load_vocab(vocab_file="vocab.pkl"):
     with open(vocab_file, "rb") as f:
         vocab = pickle.load(f)
     return vocab["stoi"], vocab["itos"]
 
+
 def encode(text, stoi):
-    # A simple whitespace tokenizer; adjust if you used a more advanced tokenizer.
+    # Simple whitespace tokenizer.
     tokens = text.split()
     token_ids = [stoi.get(token, 0) for token in tokens]  # 0 is <unk>
     return token_ids
+
 
 def decode(token_ids, itos):
     tokens = [itos[i] for i in token_ids]
     return " ".join(tokens)
 
+
 # ------------------------------
 # Text Generation Function
 # ------------------------------
-
 def generate_text(model, prompt, stoi, itos, max_length=50):
     model.eval()
     # Encode the prompt
     input_ids = encode(prompt, stoi)
     generated = input_ids.copy()
-
-    # Convert to tensor and move to device
     input_tensor = torch.tensor([generated], dtype=torch.long).to(device)
+
     with torch.no_grad():
         for _ in range(max_length):
             logits = model(input_tensor)  # (batch, seq_len, vocab_size)
-            # Get the logits for the last token and apply greedy sampling
             next_token_logits = logits[0, -1, :]
             next_token = torch.argmax(next_token_logits).item()
             generated.append(next_token)
-            # Update input_tensor with the newly generated token
             input_tensor = torch.tensor([generated], dtype=torch.long).to(device)
     return decode(generated, itos)
 
-# ------------------------------
-# Main Inference Code (Interactive Chat)
-# ------------------------------
 
+# ------------------------------
+# Main Interactive Chat for Shakespeare GPT
+# ------------------------------
 if __name__ == "__main__":
     # Set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -116,23 +113,27 @@ if __name__ == "__main__":
     try:
         stoi, itos = load_vocab("vocab.pkl")
     except FileNotFoundError:
-        print("Vocabulary file 'vocab.pkl' not found. Make sure to save your vocabulary during training.")
+        print("Vocabulary file 'vocab.pkl' not found. Please ensure you saved it during training.")
         exit(1)
     actual_vocab_size = len(itos)
     print(f"Vocabulary size: {actual_vocab_size}")
 
-    # Initialize and load the trained model
+    # Initialize model and load trained weights (for Shakespeare GPT)
     model = GPTSmall(actual_vocab_size).to(device)
-    model_state = torch.load("gpt_small.pth", map_location=device)
+    try:
+        model_state = torch.load("gpt_shakespeare.pth", map_location=device)
+    except FileNotFoundError:
+        print("Model file 'gpt_shakespeare.pth' not found. Please train your model first.")
+        exit(1)
     model.load_state_dict(model_state)
     model.eval()
-    print("Model loaded successfully. You can start chatting now.")
+    print("GPT model loaded successfully. Let's converse!")
 
-    # Interactive loop
-    print("Enter 'quit' to exit.")
+    # Interactive chat loop
+    print("Enter your prompt below (type 'quit' to exit):")
     while True:
         prompt = input("You: ")
-        if prompt.lower() == "quit":
+        if prompt.strip().lower() == "quit":
             break
         response = generate_text(model, prompt, stoi, itos, max_length=50)
         print("GPT:", response)
