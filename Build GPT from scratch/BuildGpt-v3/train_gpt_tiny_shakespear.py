@@ -134,7 +134,7 @@ def main():
     print(f"Using {device} for training.")
 
     # Load training data from CSV
-    train_file = "../train.csv"
+    train_file = "../BuildGPT-v4-Shakespear/train.csv"
     if not os.path.exists(train_file):
         print(f"Error: {train_file} not found.")
         return
